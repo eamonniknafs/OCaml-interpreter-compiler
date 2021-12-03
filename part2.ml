@@ -49,7 +49,7 @@ let parse (p : 'a parser) (s : string) : ('a * char list) option =
 let pure (x : 'a) : 'a parser =
   fun ls -> Some (x, ls)
 
-let fail : 'a parser = fun ls -> None
+let fail : 'a parser = fun _ -> None
 
 let bind (p : 'a parser) (q : 'a -> 'b parser) : 'b parser =
   fun ls ->
@@ -328,6 +328,7 @@ type value =
 
 type stack = value list
 
+type environment = (name * value) list
 type result =
   | Ok of stack
   | Error
@@ -352,10 +353,10 @@ let string_of_log log =
   in
   "[" ^ loop log ^ "]"
 
-let rec find_val (x : string) (env : (string * value) list) =
+let rec find_val (x : name) (env : environment) =
   match env with
   | [] -> None
-  | (name, value) :: rest -> if name == x then Some value else find_val x rest
+  | (n, v) :: rest -> if n = x then Some v else find_val x rest
 
 let rec interp st cmds env log =
   match cmds with
@@ -395,13 +396,13 @@ let rec interp st cmds env log =
     | _ -> (Error, log))
   | Let :: cmds -> (
     match st with
-    | value :: NVal name :: st -> interp st cmds ((name, value) :: env) log
+    | v :: NVal n :: st -> interp st cmds ((n, v) :: env) log
     | _ -> (Error, log))
   | Lookup :: cmds -> (
     match st with
-    | NVal name :: st -> (
-      match (find_val name env) with
-      | Some value -> interp (value::st) cmds env log
+    | NVal n :: st -> (
+      match find_val n env with
+      | Some v -> interp (v :: st) cmds env log
       | None -> (Error, log)
     )
     | _ -> (Error, log))
