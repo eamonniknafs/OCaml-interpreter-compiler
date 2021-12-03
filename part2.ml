@@ -211,7 +211,7 @@ type cmd =
   | Trace
   | Ifgz  of cmds * cmds
   | Let
-
+  | Lookup
 and cmds = cmd list
 
 (* part1 parser *)
@@ -229,6 +229,7 @@ let reserved = [
   "Fun";
   "End";
   "Let";
+  "Lookup";
 ]
 
 let name : string parser =
@@ -290,6 +291,10 @@ and let_parser () =
   let* _ = keyword "Let" in
   pure (Let)
 
+and lookup_parser () =
+  let* _ = keyword "Lookup" in
+  pure (Lookup)
+
 and ifgz_parser () =
   let* _ = keyword "If" in
   let* cmds1 = cmds_parser () in
@@ -306,7 +311,8 @@ and cmd_parser () =
   div_parser () <|>
   trace_parser () <|>
   ifgz_parser () <|>
-  let_parser ()
+  let_parser () <|>
+  lookup_parser ()
 
 and cmds_parser () =
   many (cmd_parser ())
@@ -346,6 +352,11 @@ let string_of_log log =
   in
   "[" ^ loop log ^ "]"
 
+let rec find_val (x : string) (env : (string * value) list) =
+  match env with
+  | [] -> None
+  | (name, value) :: rest -> if name == x then Some value else find_val x rest
+
 let rec interp st cmds env log =
   match cmds with
   | (Push (I n)) :: cmds ->
@@ -384,7 +395,15 @@ let rec interp st cmds env log =
     | _ -> (Error, log))
   | Let :: cmds -> (
     match st with
-    | value :: NVal name :: st -> interp (st) cmds ((name, value) :: env) log
+    | value :: NVal name :: st -> interp st cmds ((name, value) :: env) log
+    | _ -> (Error, log))
+  | Lookup :: cmds -> (
+    match st with
+    | NVal name :: st -> (
+      match (find_val name env) with
+      | Some value -> interp (value::st) cmds env log
+      | None -> (Error, log)
+    )
     | _ -> (Error, log))
   | [] -> (Ok st, log)
 
