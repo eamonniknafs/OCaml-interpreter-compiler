@@ -209,9 +209,10 @@ type cmd =
   | Mul
   | Div
   | Trace
-  | Ifgz  of cmds * cmds
+  | Ifgz of cmds * cmds
   | Let
   | Lookup
+  | BeginEnd of cmds
 and cmds = cmd list
 
 (* part1 parser *)
@@ -230,6 +231,7 @@ let reserved = [
   "End";
   "Let";
   "Lookup";
+  "Begin";
 ]
 
 let name : string parser =
@@ -303,6 +305,12 @@ and ifgz_parser () =
   let* _ = keyword "End" in
   pure (Ifgz (cmds1, cmds2))
 
+and begin_end_parser () =
+  let* _ = keyword "Begin" in
+  let* cmdsBE = cmds_parser () in
+  let* _ = keyword "End" in
+  pure (BeginEnd (cmdsBE))
+
 and cmd_parser () = 
   push_parser () <|>
   add_parser () <|>
@@ -312,7 +320,8 @@ and cmd_parser () =
   trace_parser () <|>
   ifgz_parser () <|>
   let_parser () <|>
-  lookup_parser ()
+  lookup_parser () <|>
+  begin_end_parser ()
 
 and cmds_parser () =
   many (cmd_parser ())
@@ -406,9 +415,20 @@ let rec interp st cmds env log =
       | None -> (Error, log)
     )
     | _ -> (Error, log))
+  | BeginEnd cmdsBE :: cmds -> (
+    match interp [] cmdsBE env [] with
+    | Ok (v :: _), logs -> interp (v::st) cmds env (log@logs)
+    | _ -> (Error, log))
   | [] -> (Ok st, log)
 
 (* end of parser combinators *)
+
+(* let rec implode_stack (ls: stack) (s: string) : string  =
+  match ls, s with
+  | IVal h::t, s -> implode_stack t (string_of_int h)^s
+  | UVal ::t, s -> implode_stack t "()"^s
+  | NVal h::t, s -> implode_stack t h^s
+  | [], s -> s *)
 
 (* Interprets a program written in the Part1 Stack Language.
  * Required by the autograder, do not change its type. *)
@@ -417,6 +437,7 @@ let interpreter src =
   | Some (cmds, []) -> (
     match interp [] cmds [] [] with
     | Ok (v :: _), logs -> (string_of_value v, logs)
+    (* | Ok (st), logs -> ((implode_stack st ""), logs) *)
     | _ -> ("Error", []))
   | _ -> ("Error", [])
 
