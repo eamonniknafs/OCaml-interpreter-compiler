@@ -444,12 +444,12 @@ let rec interp st cmds env log =
     | _ -> (Error, log))
   | Fun closure :: cmds -> (
     match closure with
-    | (fname, arg, cmdsFUN) -> interp st cmds ((fname, CVal (fname, arg, cmdsFUN, []))::env) log
+    | (fname, arg, cmdsFUN) -> interp st cmds ((fname, CVal (fname, arg, cmdsFUN, env))::env) log
     | _ -> (Error, log))
   | Call :: cmds -> (
     match st with
     | IVal argV :: CVal (fname, arg, cmdsFUN, envFUN) :: st -> (
-      match interp [] cmdsFUN ((fname, CVal (fname, arg, cmdsFUN, envFUN)) :: (arg, IVal argV) :: envFUN) [] with
+      match interp [] cmdsFUN  ((fname, CVal (fname, arg, cmdsFUN, envFUN)) :: (arg, IVal argV) :: envFUN) [] with
       | Ok (v :: _), logs -> interp (v::st) cmds env (log@logs)
       | _ -> (Error, log))
     | _ -> (Error, log))
@@ -459,9 +459,7 @@ let rec interp st cmds env log =
 
 (* let rec implode_stack (ls: stack) (s: string) : string  =
   match ls, s with
-  | IVal h::t, s -> implode_stack t (string_of_int h)^s
-  | UVal ::t, s -> implode_stack t "()"^s
-  | NVal h::t, s -> implode_stack t h^s
+  | h::t, s -> implode_stack t (string_of_value h)^s
   | [], s -> s *)
 
 (* Interprets a program written in the Part1 Stack Language.
