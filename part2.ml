@@ -213,6 +213,8 @@ type cmd =
   | Let
   | Lookup
   | BeginEnd of cmds
+  | Fun of (name * name * cmds)
+  | Call
 and cmds = cmd list
 
 (* part1 parser *)
@@ -232,6 +234,8 @@ let reserved = [
   "Let";
   "Lookup";
   "Begin";
+  "Fun";
+  "Call";
 ]
 
 let name : string parser =
@@ -311,6 +315,18 @@ and begin_end_parser () =
   let* _ = keyword "End" in
   pure (BeginEnd (cmdsBE))
 
+and fun_parser () =
+  let* _ = keyword "Fun" in
+  let* fname = name in
+  let* arg = name in
+  let* cmdsFUN = cmds_parser () in
+  let* _ = keyword "End" in
+  pure (Fun (fname, arg, cmdsFUN))
+
+and call_parser () =
+  let* _ = keyword "Call" in
+  pure (Call)
+
 and cmd_parser () = 
   push_parser () <|>
   add_parser () <|>
@@ -321,7 +337,9 @@ and cmd_parser () =
   ifgz_parser () <|>
   let_parser () <|>
   lookup_parser () <|>
-  begin_end_parser ()
+  begin_end_parser () <|>
+  fun_parser () <|>
+  call_parser ()
 
 and cmds_parser () =
   many (cmd_parser ())
@@ -334,10 +352,14 @@ type value =
   | IVal of int
   | NVal of string
   | UVal
+  | CVal of closure
+and
+environment = (name * value) list
+and
+closure = (name * name * cmds * environment)
 
 type stack = value list
 
-type environment = (name * value) list
 type result =
   | Ok of stack
   | Error
@@ -347,6 +369,7 @@ let string_of_value v =
   | IVal n -> string_of_int n
   | NVal s -> s
   | UVal -> "()"
+  | CVal (n, _, _, _) -> "Closure for fun: "^n
 
 let string_of_result res =
   match res with
@@ -418,6 +441,17 @@ let rec interp st cmds env log =
   | BeginEnd cmdsBE :: cmds -> (
     match interp [] cmdsBE env [] with
     | Ok (v :: _), logs -> interp (v::st) cmds env (log@logs)
+    | _ -> (Error, log))
+  | Fun closure :: cmds -> (
+    match closure with
+    | (fname, arg, cmdsFUN) -> interp st cmds ((fname, CVal (fname, arg, cmdsFUN, []))::env) log
+    | _ -> (Error, log))
+  | Call :: cmds -> (
+    match st with
+    | IVal argV :: CVal (fname, arg, cmdsFUN, envFUN) :: st -> (
+      match interp [] cmdsFUN ((fname, CVal (fname, arg, cmdsFUN, envFUN)) :: (arg, IVal argV) :: envFUN) [] with
+      | Ok (v :: _), logs -> interp (v::st) cmds env (log@logs)
+      | _ -> (Error, log))
     | _ -> (Error, log))
   | [] -> (Ok st, log)
 
