@@ -49,7 +49,7 @@ let parse (p : 'a parser) (s : string) : ('a * char list) option =
 let pure (x : 'a) : 'a parser =
   fun ls -> Some (x, ls)
 
-let fail : 'a parser = fun _ -> None
+let fail : 'a parser = fun ls -> None
 
 let bind (p : 'a parser) (q : 'a -> 'b parser) : 'b parser =
   fun ls ->
@@ -193,7 +193,7 @@ let keyword (s : string) : unit parser =
   
 (* end of parser combinators *)
 
-(* part1 AST *)
+(* part2 AST *)
 
 type name = string
 
@@ -212,12 +212,12 @@ type cmd =
   | Ifgz of cmds * cmds
   | Let
   | Lookup
-  | BeginEnd of cmds
+  | Block of cmds
   | Fun of (name * name * cmds)
   | Call
 and cmds = cmd list
 
-(* part1 parser *)
+(* part2 parser *)
 
 let reserved = [
   "Push";
@@ -301,6 +301,12 @@ and lookup_parser () =
   let* _ = keyword "Lookup" in
   pure (Lookup)
 
+and block_parser () =
+  let* _ = keyword "Begin" in
+  let* cmds = cmds_parser () in
+  let* _ = keyword "End" in
+  pure (Block cmds)
+
 and ifgz_parser () =
   let* _ = keyword "If" in
   let* cmds1 = cmds_parser () in
@@ -309,19 +315,13 @@ and ifgz_parser () =
   let* _ = keyword "End" in
   pure (Ifgz (cmds1, cmds2))
 
-and begin_end_parser () =
-  let* _ = keyword "Begin" in
-  let* cmdsBE = cmds_parser () in
-  let* _ = keyword "End" in
-  pure (BeginEnd (cmdsBE))
-
 and fun_parser () =
   let* _ = keyword "Fun" in
   let* fname = name in
   let* arg = name in
-  let* cmdsFUN = cmds_parser () in
+  let* bod = cmds_parser () in
   let* _ = keyword "End" in
-  pure (Fun (fname, arg, cmdsFUN))
+  pure (Fun (fname, arg, bod))
 
 and call_parser () =
   let* _ = keyword "Call" in
@@ -334,17 +334,17 @@ and cmd_parser () =
   mul_parser () <|>
   div_parser () <|>
   trace_parser () <|>
-  ifgz_parser () <|>
   let_parser () <|>
   lookup_parser () <|>
-  begin_end_parser () <|>
+  block_parser () <|>
+  ifgz_parser () <|>
   fun_parser () <|>
   call_parser ()
 
 and cmds_parser () =
   many (cmd_parser ())
 
-let parse_cmds = parse (ws >> cmds_parser ())
+let parse_cmds s = parse (ws >> cmds_parser ()) s
 
 (* interpreter *)
 
@@ -352,11 +352,12 @@ type value =
   | IVal of int
   | NVal of string
   | UVal
-  | CVal of closure
-and
-environment = (name * value) list
-and
-closure = (name * name * cmds * environment)
+  | FVal of string *
+            string *
+            cmds *
+            env
+
+and env = (string * value) list
 
 type stack = value list
 
@@ -369,7 +370,7 @@ let string_of_value v =
   | IVal n -> string_of_int n
   | NVal s -> s
   | UVal -> "()"
-  | CVal (n, _, _, _) -> "Closure for fun: "^n
+  | FVal _ -> "<fun>"
 
 let string_of_result res =
   match res with
@@ -385,12 +386,17 @@ let string_of_log log =
   in
   "[" ^ loop log ^ "]"
 
-let rec find_val (x : name) (env : environment) =
-  match env with
-  | [] -> None
-  | (n, v) :: rest -> if n = x then Some v else find_val x rest
+let stack_checker st =
+  List.for_all 
+    (fun v ->
+      match v with
+      | IVal i -> i >= 0
+      | _ -> true) st
 
 let rec interp st cmds env log =
+  let _ = 
+    if not (stack_checker st) then failwith "negative"
+  in
   match cmds with
   | (Push (I n)) :: cmds ->
     interp ((IVal n) :: st) cmds env log
@@ -432,25 +438,25 @@ let rec interp st cmds env log =
     | _ -> (Error, log))
   | Lookup :: cmds -> (
     match st with
-    | NVal n :: st -> (
-      match find_val n env with
+    | NVal s :: st -> (
+      match List.assoc_opt s env with
       | Some v -> interp (v :: st) cmds env log
-      | None -> (Error, log)
-    )
+      | None -> (Error, log))
     | _ -> (Error, log))
-  | BeginEnd cmdsBE :: cmds -> (
-    match interp [] cmdsBE env log with
-    | Ok (v :: _), logs -> interp (v::st) cmds env logs
+  | Block local :: cmds -> (
+    match interp [] local env log with
+    | (Ok (v :: _), log) -> interp (v :: st) cmds env log
     | _ -> (Error, log))
-  | Fun closure :: cmds -> (
-    match closure with
-    | (fname, arg, cmdsFUN) -> interp st cmds ((fname, CVal (fname, arg, cmdsFUN, env))::env) log
-    | _ -> (Error, log))
+  | Fun (fn, arg, bod) :: cmds ->
+    let fv = FVal (fn, arg, bod, env) in
+    interp st cmds ((fn, fv) :: env) log
   | Call :: cmds -> (
     match st with
-    | IVal argV :: CVal (fname, arg, cmdsFUN, envFUN) :: st -> (
-      match interp [] cmdsFUN  ((fname, CVal (fname, arg, cmdsFUN, envFUN)) :: (arg, IVal argV) :: envFUN) [] with
-      | Ok (v :: _), logs -> interp (v::st) cmds env (logs@log)
+    | v :: FVal (fn, arg, bod, env') ::st -> (
+      let env' = (fn, FVal (fn, arg, bod, env')) :: env' in
+      let env' = (arg, v) :: env' in
+      match interp [] bod env' log with
+      | (Ok (v :: _), log) -> interp (v :: st) cmds env log
       | _ -> (Error, log))
     | _ -> (Error, log))
   | [] -> (Ok st, log)
@@ -462,7 +468,7 @@ let rec interp st cmds env log =
   | h::t, s -> implode_stack t (string_of_value h)^s
   | [], s -> s *)
 
-(* Interprets a program written in the Part1 Stack Language.
+(* Interprets a program written in the Part2 Stack Language.
  * Required by the autograder, do not change its type. *)
 let interpreter src =
   match parse_cmds src with
