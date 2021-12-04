@@ -440,7 +440,7 @@ let rec interp st cmds env log =
     | _ -> (Error, log))
   | BeginEnd cmdsBE :: cmds -> (
     match interp [] cmdsBE env [] with
-    | Ok (v :: _), logs -> interp (v::st) cmds env (log@logs)
+    | Ok (v :: _), logs -> interp (v::st) cmds env (logs@log)
     | _ -> (Error, log))
   | Fun closure :: cmds -> (
     match closure with
