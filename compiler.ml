@@ -349,6 +349,21 @@ and letrec_parser () =
 let parse_prog (s : string) : (term * char list) option = 
   parse (ws >> term_parser ()) s
   
+(* type term =
+  (* lambda calculus *)
+  | Name  of name
+  | Fun   of name * name * term
+  | App   of term * term
+  (* extensions *)
+  | Ifgz  of term * term * term
+  | LetIn of name * term * term
+  | Unit
+  | Int   of int
+  | Add   of term * term
+  | Sub   of term * term
+  | Mul   of term * term
+  | Div   of term * term
+  | Trace of term *)
 (* compiler *)
 let rec eval term out =
   match term with
@@ -359,8 +374,11 @@ let rec eval term out =
   | Mul (t1, t2) ->(out^(eval t1 "")^(eval t2 "")^" Mul ")
   | Div (t1, t2) ->(out^(eval t1 "")^(eval t2 "")^" Div ")
   | Trace (term) -> (out^(eval term "")^" Trace ")
+  | Fun (n1, n2, term) -> (" Fun "^n1^" "^n2^(eval term "")^" End Push "^n1^" Lookup ")
+  | App (t1, t2) -> ((eval t1 "")^(eval t2 "")^" Call ")
   | Int i -> (" Push " ^ string_of_int i^" ")
   | Name n -> (" Push "^n^" Lookup ")
+  | Unit -> " Push () "
   | _ -> out
 
 (* Compiles a program written in the Part3 Term Language to Part2 Stack Language.
