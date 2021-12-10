@@ -352,37 +352,15 @@ let parse_prog (s : string) : (term * char list) option =
 (* compiler *)
 let rec eval term out =
   match term with
-  | LetIn (name, Int term, rest) -> ("Begin Push "^name^" Push "^(string_of_int term)^" Let "^eval rest out^"End ")
   | LetIn (name, term, rest) -> ("Begin Push "^name^" "^(eval term "")^" Let "^eval rest out^"End ")
-  
-  | Ifgz (t1, t2, t3) -> "Error"
-
-  | Add (Name t1, Name t2) ->(out^" Push "^t1^" Lookup Push "^t2^" Lookup Add ")
-  | Add (t1, Name t2) ->(out^" Push "^(eval t1 "")^" Lookup Push "^t2^" Lookup Add ")
-  | Add (Name t1, t2) ->(out^" Push "^t1^" Lookup Push "^(eval t2 "")^" Lookup Add ")
-  | Add (t1, t2) ->(out^" Push "^(eval t1 "")^" Lookup Push "^(eval t2 "")^" Lookup Add ")
-
-  | Sub (Name t1, Name t2) ->(out^" Push "^t1^" Lookup Push "^t2^" Lookup Sub")
-  | Sub (t1, Name t2) ->(out^" Push "^(eval t1 "")^" Lookup Push "^t2^" Lookup Sub")
-  | Sub (Name t1, t2) ->(out^" Push "^t1^" Lookup Push "^(eval t2 "")^" Lookup Sub")
-  | Sub (t1, t2) ->(out^" Push "^(eval t1 "")^" Lookup Push "^(eval t2 "")^" Lookup Sub")
-
-  | Mul (Name t1, Name t2) ->(out^" Push "^t1^" Lookup Push "^t2^" Lookup Mul")
-  | Mul (t1, Name t2) ->(out^" Push "^(eval t1 "")^" Lookup Push "^t2^" Lookup Mul")
-  | Mul (Name t1, t2) ->(out^" Push "^t1^" Lookup Push "^(eval t2 "")^" Lookup Mul")
-  | Mul (t1, t2) ->(out^" Push "^(eval t1 "")^" .Lookup Push "^(eval t2 "")^" Lookup Mul")
-
-  | Div (Name t1, Name t2) ->(out^" Push "^t1^" Lookup Push "^t2^" Lookup Div")
-  | Div (t1, Name t2) ->(out^" Push "^(eval t1 "")^" Lookup Push "^t2^" Lookup Div")
-  | Div (Name t1, t2) ->(out^" Push "^t1^" Lookup Push "^(eval t2 "")^" Lookup Div")
-  | Div (t1, t2) ->(out^" Push "^(eval t1 "")^" Lookup Push "^(eval t2 "")^" Lookup Div")
-
+  | Ifgz (t1, t2, t3) -> ((eval t1 "")^" If Begin"^(eval t2 "")^" End Else Begin"^(eval t3 "")^" End End ")
+  | Add (t1, t2) ->(out^(eval t1 "")^(eval t2 "")^" Add ")
+  | Sub (t1, t2) ->(out^(eval t1 "")^(eval t2 "")^" Sub")
+  | Mul (t1, t2) ->(out^(eval t1 "")^(eval t2 "")^" Mul")
+  | Div (t1, t2) ->(out^(eval t1 "")^(eval t2 "")^" Div")
   | Trace (term) -> "Error"
-
-  | Int i -> string_of_int i
-
+  | Int i -> (" Push " ^ string_of_int i)
   | Name n -> (" Push "^n^" Lookup ")
-
   | _ -> out
 
 (* Compiles a program written in the Part3 Term Language to Part2 Stack Language.
