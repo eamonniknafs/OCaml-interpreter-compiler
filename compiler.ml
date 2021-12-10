@@ -352,14 +352,14 @@ let parse_prog (s : string) : (term * char list) option =
 (* compiler *)
 let rec eval term out =
   match term with
-  | LetIn (name, term, rest) -> ("Begin Push "^name^" "^(eval term "")^" Let "^eval rest out^"End ")
-  | Ifgz (t1, t2, t3) -> ((eval t1 "")^" If Begin"^(eval t2 "")^" End Else Begin"^(eval t3 "")^" End End ")
+  | LetIn (name, term, rest) -> (" Begin Push "^name^(eval term "")^" Let "^(eval rest out)^" End ")
+  | Ifgz (t1, t2, t3) -> ((eval t1 "")^" If Begin "^(eval t2 "")^" End Else Begin "^(eval t3 "")^" End End ")
   | Add (t1, t2) ->(out^(eval t1 "")^(eval t2 "")^" Add ")
-  | Sub (t1, t2) ->(out^(eval t1 "")^(eval t2 "")^" Sub")
-  | Mul (t1, t2) ->(out^(eval t1 "")^(eval t2 "")^" Mul")
-  | Div (t1, t2) ->(out^(eval t1 "")^(eval t2 "")^" Div")
-  | Trace (term) -> "Error"
-  | Int i -> (" Push " ^ string_of_int i)
+  | Sub (t1, t2) ->(out^(eval t1 "")^(eval t2 "")^" Sub ")
+  | Mul (t1, t2) ->(out^(eval t1 "")^(eval t2 "")^" Mul ")
+  | Div (t1, t2) ->(out^(eval t1 "")^(eval t2 "")^" Div ")
+  | Trace (term) -> (out^(eval term "")^" Trace ")
+  | Int i -> (" Push " ^ string_of_int i^" ")
   | Name n -> (" Push "^n^" Lookup ")
   | _ -> out
 
